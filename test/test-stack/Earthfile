@@ -1,0 +1,41 @@
+VERSION 0.8
+IMPORT ../../base/alpine
+IMPORT ../../base/ubuntu
+IMPORT ../../builder
+IMPORT ../../installer
+
+ARG BASE_TAG="lugendre/earthly-haskell-test:"
+
+test-deps-noopt:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  WORKDIR /test
+  COPY --keep-ts package.yaml . # COPY cannot understand some globs(e.g. "**").
+  DO builder+GENERATE_PACKAGE_CABAL
+  DO builder+DEPS \
+    --LTS_VERSION=lts-22.9 \
+    --JOBS=4
+
+test-production-build-static:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  # Cache the base image
+  SAVE IMAGE --push "${BASE_TAG}alpine-ghc9.6.4-stack"
+  WORKDIR /production
+  COPY --keep-ts . .
+  DO builder+GENERATE_PACKAGE_CABAL
+  # Build only dependencies
+  DO builder+DEPS --LTS_VERSION=lts-22.9
+  # Cache the dependencies
+  SAVE IMAGE --push "${BASE_TAG}prodstatic-test-alpine-stack"
+  SAVE ARTIFACT cabal.project.freeze AS LOCAL .
+  DO builder+PRODUCTION_BUILD_STATIC \
+    --TARGET=all \
+    --JOBS=4
+  FOR binary IN $(cabal list-bin all)
+    SAVE ARTIFACT $binary AS LOCAL output/
+  END
+
+test-all:
+  BUILD +test-deps-noopt
+  BUILD +test-production-build-static

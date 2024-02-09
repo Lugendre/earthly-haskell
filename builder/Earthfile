@@ -1,0 +1,105 @@
+VERSION 0.8
+
+IMPORT ../installer
+
+LET LLVM_OPTIONS="--ghc-options=\"-fllvm -pgmlo "${GHC_LLVM_OPT_PATH}" -pgmlc "${GHC_LLVM_LLC_PATH}" -optlo-O3 -mavx2\""
+
+FREEZE_WITH_STACKAGE:
+  FUNCTION
+  ARG --required LTS_VERSION
+  RUN curl "https://www.stackage.org/${LTS_VERSION}/cabal.config" > cabal.project.freeze
+
+GENERATE_PACKAGE_CABAL:
+  FUNCTION
+  FOR p IN $(find . -type f -name package.yaml)
+    RUN hpack "${p}"
+  END
+
+# You must run "COPY --keep-ts $(find . -type f -name *.cabal) ." before running this command.
+DEPS:
+  FUNCTION
+  ARG --required LTS_VERSION
+  ARG EXTRA_OPTIONS
+  ARG WITH_LLVM=0
+  ARG JOBS=1
+  DO +FREEZE_WITH_STACKAGE --LTS_VERSION=$LTS_VERSION
+  RUN cabal v2-update
+  LET ARGS="v2-build --jobs=${JOBS} --enable-tests --enable-benchmarks --only-dependencies"
+  IF [ "${WITH_LLVM}" = "1" ]
+    SET ARGS="${ARGS} "${LLVM_OPTIONS}" ${EXTRA_OPTIONS}"
+  ELSE
+    SET ARGS="${ARGS} ${EXTRA_OPTIONS}"
+  END
+  RUN eval cabal "${ARGS}"
+
+TEST:
+  FUNCTION
+  ARG --required TARGET
+  ARG JOBS=1
+  ARG EXTRA_OPTIONS
+  LET ARGS="v2-configure --jobs=${JOBS} --disable-optimization --ghc-options=\"-Wall -Werror\" --enable-tests --enable-benchmarks ${EXTRA_OPTIONS}"
+  RUN eval cabal "${ARGS}"
+  RUN cabal v2-test $TARGET
+
+BUILD_SIMPLE:
+  FUNCTION
+  ARG --required TARGET
+  ARG JOBS=1
+  ARG WITH_LLVM=0
+  ARG EXTRA_OPTIONS
+  LET ARGS="v2-configure --jobs=${JOBS} --disable-optimization --ghc-options=-Wall --enable-tests --enable-benchmarks ${EXTRA_OPTIONS}"
+  IF [ "${WITH_LLVM}" = "1" ]
+    SET ARGS="${ARGS} ${LLVM_OPTIONS}"
+  ELSE
+    SET ARGS="${ARGS}"
+  END
+  RUN eval cabal "${ARGS}"
+  RUN cabal v2-build $TARGET
+
+BUILD:
+  FUNCTION
+  ARG --required TARGET
+  ARG JOBS=1
+  ARG WITH_LLVM=0
+  ARG EXTRA_OPTIONS
+  DO +BUILD_SIMPLE --TARGET=$TARGET --JOBS=$JOBS --WITH_LLVM=$WITH_LLVM \
+    --EXTRA_OPTIONS="--ghc-options=-Werror ${EXTRA_OPTIONS}"
+
+BUILD_STATIC:
+  FUNCTION
+  ARG --required TARGET
+  ARG JOBS=1
+  ARG EXTRA_OPTIONS
+  LET ARGS="--enable-static --enable-executable-static ${EXTRA_OPTIONS}"
+  DO +BUILD_SIMPLE --TARGET=$TARGET --JOBS=$JOBS -WITH_LLVM=0 --EXTRA_OPTIONS="${ARGS}"
+
+PRODUCTION_BUILD:
+  FUNCTION
+  ARG --required TARGET
+  ARG JOBS=1
+  ARG WITH_LLVM=0
+  ARG WITH_VECTOR=1
+  ARG EXTRA_OPTIONS
+  LET ARGS="v2-configure --jobs=${JOBS} --enable-optimization=2 ${EXTRA_OPTIONS}"
+  IF [ "${WITH_LLVM}" = "1" ]
+    SET ARGS="${ARGS} ${LLVM_OPTIONS}"
+  END
+  IF [ "${WITH_VECTOR}" = "1" ]
+    SET ARGS="${ARGS} --constraint=\"vector -boundscheck\""
+  END
+  RUN eval cabal "${ARGS}"
+  RUN cabal v2-build $TARGET
+
+PRODUCTION_BUILD_STATIC:
+  FUNCTION
+  ARG --required TARGET
+  ARG JOBS=1
+  ARG WITH_VECTOR=1
+  ARG EXTRA_OPTIONS=""
+  LET ARGS="--enable-static --enable-executable-static ${EXTRA_OPTIONS}"
+  DO +PRODUCTION_BUILD \
+    --TARGET=$TARGET \
+    --JOBS=1 \
+    --WITH_LLVM=0 \
+    --WITH_VECTOR=1 \
+    --EXTRA_OPTIONS="${ARGS}"

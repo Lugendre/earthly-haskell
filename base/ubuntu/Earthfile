@@ -1,0 +1,57 @@
+VERSION 0.8
+ARG BASE_TAG=lugendre/earthly-haskell-ubuntu:
+
+ubuntu-base-sytem:
+  ARG --required UBUNTU_VERSION
+  FROM ubuntu:${UBUNTU_VERSION}
+  ENV DEBIAN_FRONTEND=noninteractive
+  ENV LANG=C.UTF-8
+  RUN apt-get update && \
+    apt-get install -y --no-install-recommends --no-install-suggests \
+        bash \
+        ca-certificates \
+        build-essential \
+        curl \
+        gnupg \
+        libffi-dev \
+        libgmp-dev \
+        libnuma-dev \
+        zlib1g-dev \
+        zip \
+        unzip \
+        sudo \
+        libtinfo-dev \
+        software-properties-common \
+    && add-apt-repository -y ppa:git-core/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+INSTALL_LLVM:
+  FUNCTION
+  ARG --required LLVM_VERSION
+  ARG --required LLVM_KEY
+  RUN set -eux; \
+    GNUPGHOME="$(mktemp -d)"; export GNUPGHOME; \
+    mkdir -p /usr/local/share/keyrings/; \
+    gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "${LLVM_KEY}"; \
+    gpg --batch --armor --export "${LLVM_KEY}" > /usr/local/share/keyrings/apt.llvm.org.gpg.asc; \
+    echo "deb [arch=$(dpkg --print-architecture)  signed-by=/usr/local/share/keyrings/apt.llvm.org.gpg.asc] http://apt.llvm.org/focal/ llvm-toolchain-focal-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends --no-install-suggests "llvm-${LLVM_VERSION}" "llvm-${LLVM_VERSION}-dev"; \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*; \
+    gpgconf --kill all; \
+    rm -rf "${GNUPGHOME}";
+  ENV GHC_LLVM_LLC_PATH="/usr/lib/llvm-${LLVM_VERSION}/bin/llc"
+  ENV GHC_LLVM_OPT_PATH="/usr/lib/llvm-${LLVM_VERSION}/bin/opt"
+
+ubuntu20.04:
+  FROM +ubuntu-base-sytem --UBUNTU_VERSION=20.04
+  ARG TAG=${BASE_TAG}ubuntu20.04
+  SAVE IMAGE --push "$TAG"
+
+ubuntu20.04-llvm12:
+  FROM +ubuntu-base-sytem --UBUNTU_VERSION=20.04
+  ARG TAG=${BASE_TAG}ubuntu2004-llvm12
+  DO +INSTALL_LLVM --LLVM_VERSION=12 --LLVM_KEY=6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
+  SAVE IMAGE --push "$TAG"

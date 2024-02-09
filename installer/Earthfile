@@ -1,0 +1,44 @@
+VERSION 0.8
+
+INSTALL_GHCUP:
+  FUNCTION
+  ARG CABAL_VERSION=latest
+  ENV GHCUP_INSTALL_BASE_PREFIX=/usr/local
+  RUN curl --fail --output /bin/ghcup \
+        'https://downloads.haskell.org/ghcup/x86_64-linux-ghcup' \
+   && chmod 0755 /bin/ghcup \
+   && ghcup upgrade --target /bin/ghcup \
+   && ghcup install cabal "${CABAL_VERSION}" --set \
+   && /usr/local/.ghcup/bin/cabal update
+  ENV PATH="/usr/local/.ghcup/bin:$PATH"
+
+INSTALL_GHC:
+  FUNCTION
+  ARG --required GHC
+  RUN ghcup install ghc "${GHC}" --set
+
+INSTALL_STACK:
+  FUNCTION
+  ARG STACK_VERSION=latest
+  IF [ -n "${STACK_VERSION}" ]
+    RUN ghcup install stack "${STACK_VERSION}" --set
+  END
+
+INSTALL_HPACK:
+  FUNCTION
+  ARG HPACK_VERSION
+  IF [ -n "$HPACK_VERSION" ]
+    RUN cabal v2-update && \
+      cabal install hpack-"${HPACK_VERSION}" --installdir=/usr/local/bin
+  END
+
+SETUP_HASKELL:
+  FUNCTION
+  ARG --required GHC
+  ARG CABAL_VERSION=latest
+  ARG STACK_VERSION
+  ARG HPACK_VERSION
+  DO +INSTALL_GHCUP --CABAL_VERSION $CABAL_VERSION
+  DO +INSTALL_GHC --GHC $GHC
+  DO +INSTALL_STACK --STACK_VERSION $STACK_VERSION
+  DO +INSTALL_HPACK --HPACK_VERSION $HPACK_VERSION

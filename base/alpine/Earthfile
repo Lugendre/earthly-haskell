@@ -1,0 +1,37 @@
+VERSION 0.8
+ARG BASE_TAG=lugendre/earthly-haskell-alpine:
+
+alpine-base-system:
+  ARG --required ALPINE_VERSION
+  FROM alpine:$ALPINE_VERSION
+  ENV LANG=C.UTF-8
+  RUN apk update \
+    && apk add \
+        autoconf automake bash binutils-gold curl dpkg fakeroot file \
+        findutils g++ gcc git make perl shadow tar xz \
+    && apk add \
+        brotli brotli-static \
+        bzip2 bzip2-dev bzip2-static \
+        curl libcurl curl-static \
+        freetype freetype-dev freetype-static \
+        gmp-dev \
+        libffi libffi-dev \
+        libpng libpng-static \
+        ncurses-dev ncurses-static \
+        openssl-dev openssl-libs-static \
+        pcre pcre-dev \
+        pcre2 pcre2-dev \
+        sdl2 sdl2-dev \
+        sdl2_image sdl2_image-dev \
+        sdl2_mixer sdl2_mixer-dev \
+        sdl2_ttf sdl2_ttf-dev \
+        xz xz-dev \
+        zlib zlib-dev zlib-static \
+    && ln -s /usr/lib/libncursesw.so.6 /usr/lib/libtinfo.so.6
+
+# NOTE: LLVM is not available in the base system, so we need to install it manually
+
+alpine3.19.1:
+  FROM +alpine-base-system --ALPINE_VERSION=3.19.1
+  ARG TAG=${BASE_TAG}3.19.1
+  SAVE IMAGE --push ${TAG}

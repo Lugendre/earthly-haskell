@@ -1,0 +1,145 @@
+VERSION 0.8
+
+IMPORT ../../base/ubuntu
+IMPORT ../../base/alpine
+IMPORT ../../installer
+IMPORT ../../builder
+
+ARG BASE_TAG=lugendre/earthly-haskell-test:
+
+TEST_CABAL:
+  FUNCTION
+  ARG --required GHC
+  DO installer+SETUP_HASKELL --GHC=$GHC
+  WORKDIR /example
+  RUN cabal init --non-interactive --is-executable example
+  WORKDIR /example/example
+  RUN cabal v2-build example
+  RUN echo test | $(cabal list-bin example) | grep 'Hello, Haskell!'
+
+TEST_CABAL_STATIC:
+  FUNCTION
+  ARG --required GHC
+  DO installer+SETUP_HASKELL --GHC=$GHC
+  WORKDIR /example
+  RUN cabal init --non-interactive --is-executable example
+  WORKDIR /example/example
+  RUN cabal v2-build example --enable-tests --enable-benchmarks --only-dependencies
+  RUN cabal v2-build example --enable-executable-static
+  RUN file $(cabal list-bin example) | grep 'statically linked'
+  RUN echo test | $(cabal list-bin example) | grep 'Hello, Haskell!'
+
+test-cabal-ubuntu:
+  FROM ubuntu+ubuntu20.04
+  DO +TEST_CABAL --GHC=9.6.4
+
+test-cabal-static:
+  FROM alpine+alpine3.19.1
+  DO +TEST_CABAL_STATIC --GHC=9.6.4
+
+test-deps-noopt:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  WORKDIR /test
+  COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+DEPS \
+    --LTS_VERSION=lts-22.9 \
+    --JOBS=4
+
+test-deps-extra:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4
+  WORKDIR /test
+  COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+DEPS \
+    --GHC=9.6.4 \
+    --LTS_VERSION=lts-22.9 \
+    --JOBS=4 \
+    --EXTRA_OPTIONS="--constraint=\"vector -boundschecks\""
+
+test-deps-llvm:
+  FROM ubuntu+ubuntu20.04-llvm12
+  DO installer+SETUP_HASKELL --GHC=9.6.4
+  WORKDIR /test
+  COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+DEPS \
+    --GHC=9.6.4 \
+    --LTS_VERSION=lts-22.9 \
+    --WITH_LLVM=1 \
+    --JOBS=4
+
+test-deps-llvm-extra:
+  FROM ubuntu+ubuntu20.04-llvm12
+  DO installer+SETUP_HASKELL --GHC=9.6.4
+  WORKDIR /test
+  COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+DEPS \
+    --GHC=9.6.4 \
+    --LTS_VERSION=lts-22.9 \
+    --WITH_LLVM=1 \
+    --JOBS=4 \
+    --EXTRA_OPTIONS="--constraint=\"vector -boundschecks\""
+
+test-production-build-static:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4
+  # Cache the base image
+  SAVE IMAGE --push "${BASE_TAG}alpine-ghc9.6.4-static"
+  WORKDIR /production
+  COPY --keep-ts . .
+  # Build only dependencies
+  DO builder+DEPS --LTS_VERSION=lts-22.9
+  # Cache the dependencies
+  SAVE IMAGE --push "${BASE_TAG}prodstatic-test-alpine"
+  SAVE ARTIFACT cabal.project.freeze AS LOCAL .
+  DO builder+PRODUCTION_BUILD \
+    --TARGET=all \
+    --JOBS=4 \
+    --WITH_VECTOR=1 \
+    --EXTRA_OPTIONS="--enable-executable-static"
+  FOR binary IN $(cabal list-bin all)
+    SAVE ARTIFACT $binary AS LOCAL output/
+  END
+
+test-test-build-static:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4
+  SAVE IMAGE --push "${BASE_TAG}alpine-ghc9.6.4-test"
+  WORKDIR /test
+  COPY --keep-ts . .
+  DO builder+DEPS --LTS_VERSION=lts-22.9
+  SAVE IMAGE --push "${BASE_TAG}teststatic-test-alpine"
+  SAVE ARTIFACT cabal.project.freeze AS LOCAL .
+  DO builder+BUILD \
+    --TARGET=all \
+    --JOBS=4 \
+    --EXTRA_OPTIONS="--enable-executable-static"
+  RUN echo test | $(cabal list-bin all) | grep 'Hello, Haskell!'
+
+test-production-build-llvm:
+  FROM ubuntu+ubuntu20.04-llvm12
+  DO installer+SETUP_HASKELL --GHC=9.6.4
+  SAVE IMAGE --push "${BASE_TAG}ubuntu-ghc9.6.4-llvm12"
+  WORKDIR /production
+  COPY --keep-ts . .
+  DO builder+DEPS --LTS_VERSION=lts-22.9 --WITH_LLVM=1
+  SAVE IMAGE --push "${BASE_TAG}prodllvm-test-ubuntu"
+  SAVE ARTIFACT cabal.project.freeze AS LOCAL .
+  DO builder+PRODUCTION_BUILD \
+    --TARGET=all \
+    --JOBS=4 \
+    --WITH_VECTOR=1 \
+    --WITH_LLVM=1
+  RUN echo test | $(cabal list-bin all) | grep 'Hello, Haskell!'
+  SAVE ARTIFACT $(cabal list-bin all) AS LOCAL output/
+
+test-all:
+  BUILD +test-cabal-ubuntu
+  BUILD +test-cabal-static
+  BUILD +test-deps-noopt
+  BUILD +test-deps-extra
+  BUILD +test-deps-llvm
+  BUILD +test-deps-llvm-extra
+  BUILD +test-production-build-static
+  BUILD +test-test-build-static
+  BUILD +test-production-build-llvm

@@ -1,0 +1,4 @@
+**/dist-newstyle
+**/Earthfile
+output
+.tmp-earthly-out/

@@ -1,0 +1,5 @@
+**/dist-newstyle
+**/Earthfile
+example.cabal
+output
+.tmp-earthly-out/

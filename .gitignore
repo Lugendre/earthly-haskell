@@ -1,0 +1,8 @@
+**/dist-newstyle/
+**/.tmp-earthly-out/
+test/test-cabal/output
+test/test-cabal/cabal.project.freeze
+test/test-stack/.stack-work/
+test/test-stack/output
+test/test-stack/cabal.project.freeze
+test/test-stack/example.cabal
