@@ -24,7 +24,7 @@ DEPS:
   ARG JOBS=1
   DO +FREEZE_WITH_STACKAGE --LTS_VERSION=$LTS_VERSION
   RUN cabal v2-update
-  LET ARGS="v2-build --jobs=${JOBS} --enable-tests --enable-benchmarks --only-dependencies"
+  LET ARGS="v2-build all --jobs=${JOBS} --enable-tests --enable-benchmarks --only-dependencies"
   IF [ "${WITH_LLVM}" = "1" ]
     SET ARGS="${ARGS} "${LLVM_OPTIONS}" ${EXTRA_OPTIONS}"
   ELSE
