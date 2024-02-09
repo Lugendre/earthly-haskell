@@ -42,8 +42,8 @@ test-deps-noopt:
   DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
   WORKDIR /test
   COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS \
-    --LTS_VERSION=lts-22.9 \
     --JOBS=4
 
 test-deps-extra:
@@ -51,6 +51,7 @@ test-deps-extra:
   DO installer+SETUP_HASKELL --GHC=9.6.4
   WORKDIR /test
   COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS \
     --GHC=9.6.4 \
     --LTS_VERSION=lts-22.9 \
@@ -62,6 +63,7 @@ test-deps-llvm:
   DO installer+SETUP_HASKELL --GHC=9.6.4
   WORKDIR /test
   COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS \
     --GHC=9.6.4 \
     --LTS_VERSION=lts-22.9 \
@@ -73,6 +75,7 @@ test-deps-llvm-extra:
   DO installer+SETUP_HASKELL --GHC=9.6.4
   WORKDIR /test
   COPY --keep-ts *.cabal . # COPY cannot understand some globs(e.g. "**").
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS \
     --GHC=9.6.4 \
     --LTS_VERSION=lts-22.9 \
@@ -88,6 +91,7 @@ test-production-build-static:
   WORKDIR /production
   COPY --keep-ts . .
   # Build only dependencies
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS --LTS_VERSION=lts-22.9
   # Cache the dependencies
   SAVE IMAGE --push "${BASE_TAG}prodstatic-test-alpine"
@@ -107,6 +111,7 @@ test-test-build-static:
   SAVE IMAGE --push "${BASE_TAG}alpine-ghc9.6.4-test"
   WORKDIR /test
   COPY --keep-ts . .
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS --LTS_VERSION=lts-22.9
   SAVE IMAGE --push "${BASE_TAG}teststatic-test-alpine"
   SAVE ARTIFACT cabal.project.freeze AS LOCAL .
@@ -122,6 +127,7 @@ test-production-build-llvm:
   SAVE IMAGE --push "${BASE_TAG}ubuntu-ghc9.6.4-llvm12"
   WORKDIR /production
   COPY --keep-ts . .
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS --LTS_VERSION=lts-22.9 --WITH_LLVM=1
   SAVE IMAGE --push "${BASE_TAG}prodllvm-test-ubuntu"
   SAVE ARTIFACT cabal.project.freeze AS LOCAL .

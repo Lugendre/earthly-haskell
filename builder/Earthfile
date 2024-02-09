@@ -15,14 +15,11 @@ GENERATE_PACKAGE_CABAL:
     RUN hpack "${p}"
   END
 
-# You must run "COPY --keep-ts $(find . -type f -name *.cabal) ." before running this command.
 DEPS:
   FUNCTION
-  ARG --required LTS_VERSION
-  ARG EXTRA_OPTIONS
   ARG WITH_LLVM=0
   ARG JOBS=1
-  DO +FREEZE_WITH_STACKAGE --LTS_VERSION=$LTS_VERSION
+  ARG EXTRA_OPTIONS
   RUN cabal v2-update
   LET ARGS="v2-build all --jobs=${JOBS} --enable-tests --enable-benchmarks --only-dependencies"
   IF [ "${WITH_LLVM}" = "1" ]

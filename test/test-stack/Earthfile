@@ -12,6 +12,7 @@ test-deps-noopt:
   WORKDIR /test
   COPY --keep-ts package.yaml . # COPY cannot understand some globs(e.g. "**").
   DO builder+GENERATE_PACKAGE_CABAL
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS \
     --LTS_VERSION=lts-22.9 \
     --JOBS=4
@@ -25,6 +26,7 @@ test-production-build-static:
   COPY --keep-ts . .
   DO builder+GENERATE_PACKAGE_CABAL
   # Build only dependencies
+  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO builder+DEPS --LTS_VERSION=lts-22.9
   # Cache the dependencies
   SAVE IMAGE --push "${BASE_TAG}prodstatic-test-alpine-stack"
