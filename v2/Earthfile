@@ -1,0 +1,72 @@
+VERSION 0.8
+
+INIT:
+  FUNCTION
+  RUN if [ -n "$EARTHLY_CACHE_PREFIX" ]; then \
+    echo "+INIT has already been called in this build environment" ; \
+    exit 1; \
+  fi
+
+  # $EARTHLY_CACHE_PREFIX
+  ARG EARTHLY_TARGET_PROJECT_NO_TAG #https://docs.earthly.dev/docs/earthfile/builtin-args
+  ARG OS_RELEASE=fd30c92c61acbdebbd205e33534ac9bc # $(md5sum /etc/os-release | cut -d ' ' -f 1)
+  ARG cache_prefix="${EARTHLY_TARGET_PROJECT_NO_TAG}#${OS_RELEASE}#earthly-cabal-cache"
+  ENV EARTHLY_CACHE_PREFIX=$cache_prefix
+
+  ENV CABAL_DIR="/tmp/earthly/.cabal"
+
+CABAL:
+  FUNCTION
+  DO +CHECK_INITED
+  ARG --required args
+  ARG output
+  DO +SET_CACHE_MOUNTS_ENV
+  RUN --mount=$EARTHLY_HASKELL_CABAL_DIR_CACHE --mount=$EARTHLY_HASKELL_DIST_CACHE \
+    set -e; \
+    eval cabal "${args}";
+  IF [ "${output}" != "" ]
+    DO +COPY_OUTPUT --output=$output
+  END
+
+SET_CACHE_MOUNTS_ENV:
+  FUNCTION
+  DO +CHECK_INITED
+  ARG EARTHLY_TARGET_NAME #https://docs.earthly.dev/docs/earthfile/builtin-args
+  ENV EARTHLY_HASKELL_CABAL_DIR_CACHE="type=cache,mode=0777,id=${EARTHLY_CACHE_PREFIX}#cabal-dir,sharing=shared,target=${CABAL_DIR}"
+  ENV EARTHLY_HASKELL_DIST_CACHE="type=cache,mode=0777,id=${EARTHLY_CACHE_PREFIX}#target#${EARTHLY_TARGET_NAME},sharing=locked,target=dist-newstyle"
+
+COPY_OUTPUT:
+  FUNCTION
+  ARG --required output
+  ARG TMP_FOLDER="/tmp/earthly/lib/haskell"
+  RUN  if [ ! -n "$EARTHLY_HASKELL_DIST_CACHE" ]; then \
+    echo "+SET_CACHE_MOUNTS_ENV has not been called yet in this build environment" ; \
+    exit 1; \
+  fi;
+  RUN --mount=$EARTHLY_HASKELL_DIST_CACHE \
+      if [ -n "$output" ]; then  \
+          echo "Copying output files" ;  \
+          mkdir -p "${TMP_FOLDER}";  \
+          # find . -type f -regextype posix-egrep -regex "./$output" -exec cp {} $TMP_FOLDER \; ;  \
+          for file in $(cabal list-bin all); do \
+            cp $file $TMP_FOLDER; \
+          done; \
+      fi;
+  RUN mkdir -p output; \
+      mv "${TMP_FOLDER}"/* output 2>/dev/null || echo "no files found within ./output matching the provided output regexp" ;
+
+CHECK_INITED:
+  FUNCTION
+  RUN  if [ ! -n "${EARTHLY_CACHE_PREFIX}" ]; then \
+        echo "+INIT has not been called yet in this build environment" ; \
+        exit 1; \
+      fi;
+
+PRODUCTION_BUILD_STATIC:
+  FUNCTION
+  # Generate *.cabal files from package.yaml
+  RUN find . -type f -name package.yaml -exec hpack {} \;
+  ARG extra_args
+  DO +CABAL --args="v2-configure --enable-optimization=2 --enable-static --enable-executable-static ${extra_args}"
+  ARG target="all"
+  DO +CABAL --args="build ${target}" --output="all"
