@@ -44,6 +44,7 @@ COPY_OUTPUT:
     exit 1; \
   fi;
   RUN --mount=$EARTHLY_HASKELL_DIST_CACHE \
+      --mount=$EARTHLY_HASKELL_CABAL_DIR_CACHE \
       if [ -n "$output" ]; then  \
           echo "Copying output files" ;  \
           mkdir -p "${TMP_FOLDER}";  \
