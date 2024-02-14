@@ -1,43 +1,74 @@
 VERSION 0.8
 IMPORT ../../base/alpine
 IMPORT ../../base/ubuntu
-IMPORT ../../builder
 IMPORT ../../installer
+IMPORT ../../haskell
 
-ARG BASE_TAG="lugendre/earthly-haskell-test:"
-
-test-deps-noopt:
+test-build:
   FROM alpine+alpine3.19.1
   DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
   WORKDIR /test
-  COPY --keep-ts package.yaml . # COPY cannot understand some globs(e.g. "**").
-  DO builder+GENERATE_PACKAGE_CABAL
-  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
-  DO builder+DEPS \
-    --LTS_VERSION=lts-22.9 \
-    --JOBS=4
+  DO haskell+INIT
+  COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+BUILD --extra_args="--jobs=4"
+
+test-test:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  WORKDIR /test
+  DO haskell+INIT
+  COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+TEST --extra_args="--jobs=4"
+
+test-production:
+  FROM ubuntu+ubuntu20.04
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  WORKDIR /test
+  DO haskell+INIT
+  COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+PRODUCTION_BUILD --output="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
+
+test-production-build-llvm:
+  FROM ubuntu+ubuntu20.04-llvm12
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  WORKDIR /test
+  DO haskell+INIT
+  COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+PRODUCTION_BUILD_LLVM --output="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
 
 test-production-build-static:
   FROM alpine+alpine3.19.1
   DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
-  # Cache the base image
-  SAVE IMAGE --push "${BASE_TAG}alpine-ghc9.6.4-stack"
-  WORKDIR /production
-  COPY --keep-ts . .
-  DO builder+GENERATE_PACKAGE_CABAL
-  # Build only dependencies
-  DO builder+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
-  DO builder+DEPS --LTS_VERSION=lts-22.9
-  # Cache the dependencies
-  SAVE IMAGE --push "${BASE_TAG}prodstatic-test-alpine-stack"
-  SAVE ARTIFACT cabal.project.freeze AS LOCAL .
-  DO builder+PRODUCTION_BUILD_STATIC \
-    --TARGET=all \
-    --JOBS=4
-  FOR binary IN $(cabal list-bin all)
-    SAVE ARTIFACT $binary AS LOCAL output/
-  END
+  WORKDIR /test
+  DO haskell+INIT
+  COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+PRODUCTION_BUILD_STATIC --output="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
+  RUN file output/* | grep 'statically linked'
+
+test-bench:
+  FROM alpine+alpine3.19.1
+  DO installer+SETUP_HASKELL --GHC=9.6.4 --HPACK_VERSION=0.36.0
+  WORKDIR /test
+  DO haskell+INIT
+  COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+BENCH --extra_args="--jobs=4"
 
 test-all:
-  BUILD +test-deps-noopt
+  BUILD +test-build
+  BUILD +test-test
+  # BUILD +test-bench
+  BUILD +test-production
+  BUILD +test-production-build-llvm
   BUILD +test-production-build-static

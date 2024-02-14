@@ -3,34 +3,34 @@ VERSION 0.8
 INSTALL_GHCUP:
   FUNCTION
   ARG CABAL_VERSION=latest
-  ENV GHCUP_INSTALL_BASE_PREFIX=/usr/local
+  ARG --required output
   RUN curl --fail --output /bin/ghcup \
         'https://downloads.haskell.org/ghcup/x86_64-linux-ghcup' \
    && chmod 0755 /bin/ghcup \
    && ghcup upgrade --target /bin/ghcup \
-   && ghcup install cabal "${CABAL_VERSION}" --set \
-   && /usr/local/.ghcup/bin/cabal update
+   && ghcup install cabal "${CABAL_VERSION}" --isolate="${output}"
   ENV PATH="/usr/local/.ghcup/bin:$PATH"
 
 INSTALL_GHC:
   FUNCTION
   ARG --required GHC
-  RUN ghcup install ghc "${GHC}" --set
+  ARG --required output
+  RUN ghcup install ghc "${GHC}" --isolate="${output}"
 
 INSTALL_STACK:
   FUNCTION
   ARG STACK_VERSION=latest
+  ARG --required output
   IF [ -n "${STACK_VERSION}" ]
-    RUN ghcup install stack "${STACK_VERSION}" --set
+    RUN ghcup install stack "${STACK_VERSION}" --set --isolate="${output}"
   END
 
 INSTALL_HPACK:
   FUNCTION
-  ARG HPACK_VERSION
-  IF [ -n "$HPACK_VERSION" ]
-    RUN cabal v2-update && \
-      cabal install hpack-"${HPACK_VERSION}" --installdir=/usr/local/bin
-  END
+  ARG HPACK_VERSION="0.34.2"
+  ARG --required output
+  RUN cabal update; \
+    cabal install hpack --jobs --installdir="${output}" --overwrite-policy=always --install-method=copy;
 
 SETUP_HASKELL:
   FUNCTION
@@ -38,7 +38,10 @@ SETUP_HASKELL:
   ARG CABAL_VERSION=latest
   ARG STACK_VERSION
   ARG HPACK_VERSION
-  DO +INSTALL_GHCUP --CABAL_VERSION $CABAL_VERSION
-  DO +INSTALL_GHC --GHC $GHC
-  DO +INSTALL_STACK --STACK_VERSION $STACK_VERSION
-  DO +INSTALL_HPACK --HPACK_VERSION $HPACK_VERSION
+  ARG output="/usr/local/haskell"
+  RUN mkdir -p "${output}"
+  ENV PATH="${output}/bin:${output}/ghc/bin:$PATH"
+  DO +INSTALL_GHCUP --CABAL_VERSION $CABAL_VERSION --output="${output}/bin"
+  DO +INSTALL_GHC --GHC $GHC --output="${output}/ghc"
+  DO +INSTALL_STACK --STACK_VERSION $STACK_VERSION --output="${output}/bin"
+  DO +INSTALL_HPACK --HPACK_VERSION $HPACK_VERSION --output="${output}/bin"

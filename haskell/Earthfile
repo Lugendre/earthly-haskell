@@ -9,7 +9,7 @@ INIT:
 
   # $EARTHLY_CACHE_PREFIX
   ARG EARTHLY_TARGET_PROJECT_NO_TAG #https://docs.earthly.dev/docs/earthfile/builtin-args
-  ARG OS_RELEASE=fd30c92c61acbdebbd205e33534ac9bc # $(md5sum /etc/os-release | cut -d ' ' -f 1)
+  ARG OS_RELEASE=$(md5sum /etc/os-release | cut -d ' ' -f 1)
   ARG cache_prefix="${EARTHLY_TARGET_PROJECT_NO_TAG}#${OS_RELEASE}#earthly-cabal-cache"
   ENV EARTHLY_CACHE_PREFIX=$cache_prefix
 
@@ -24,7 +24,7 @@ CABAL:
   RUN --mount=$EARTHLY_HASKELL_CABAL_DIR_CACHE --mount=$EARTHLY_HASKELL_DIST_CACHE \
     set -e; \
     eval cabal "${args}";
-  IF [ "${output}" != "" ]
+  IF [ -n "${output}" ]
     DO +COPY_OUTPUT --output=$output
   END
 
@@ -48,8 +48,7 @@ COPY_OUTPUT:
       if [ -n "$output" ]; then  \
           echo "Copying output files" ;  \
           mkdir -p "${TMP_FOLDER}";  \
-          # find . -type f -regextype posix-egrep -regex "./$output" -exec cp {} $TMP_FOLDER \; ;  \
-          for file in $(cabal list-bin all); do \
+          for file in $(cabal list-bin "${output}"); do \
             cp $file $TMP_FOLDER; \
           done; \
       fi;
@@ -63,11 +62,68 @@ CHECK_INITED:
         exit 1; \
       fi;
 
+FREEZE_WITH_STACKAGE:
+  FUNCTION
+  ARG LTS_VERSION
+  IF [ ! -f "cabal.project.freeze" ]
+    IF [ -n "${LTS_VERSION}"]
+      RUN curl "https://www.stackage.org/lts-${LTS_VERSION}/cabal.config" -o cabal.project.freeze
+    END
+  END
+
+GENERATE_CABAL_FILES:
+  FUNCTION
+  RUN find . -type f -name package.yaml -exec hpack {} \;
+
+BUILD:
+  FUNCTION
+  DO +GENERATE_CABAL_FILES
+  ARG extra_args
+  DO +CABAL --args="v2-configure --disable-optimization --enable-tests --enable-benchmarks --ghc-options=\"-Wall -Werror\" ${extra_args}"
+  ARG target
+  ARG output
+  DO +CABAL --args="build ${target}" --output=$output
+
+TEST:
+  FUNCTION
+  DO +GENERATE_CABAL_FILES
+  ARG extra_args
+  DO +CABAL --args="v2-configure --disable-optimization --enable-tests --enable-benchmarks --ghc-options=\"-Wall -Werror\" ${extra_args}"
+  ARG target
+  DO +CABAL --args="test ${target}"
+
+BENCH:
+  FUNCTION
+  DO +GENERATE_CABAL_FILES
+  ARG extra_args
+  DO +CABAL --args="v2-configure --enable-optimization=2 --enable-benchmarks --ghc-options=\"-Wall -Werror\" ${extra_args}"
+  ARG target
+  DO +CABAL --args="bench ${target}"
+
+PRODUCTION_BUILD:
+  FUNCTION
+  DO +GENERATE_CABAL_FILES
+  ARG extra_args
+  DO +CABAL --args="v2-configure --enable-optimization=2 ${extra_args}"
+  ARG target
+  ARG output
+  DO +CABAL --args="build ${target}" --output=$output
+
+PRODUCTION_BUILD_LLVM:
+  FUNCTION
+  DO +GENERATE_CABAL_FILES
+  ARG extra_args
+  DO +CABAL --args="v2-configure --enable-optimization=2 --ghc-options=\"-fllvm -pgmlo "${GHC_LLVM_OPT_PATH}" -pgmlc "${GHC_LLVM_LLC_PATH}" -optlo-O3 -mavx2\" ${extra_args}"
+  ARG target
+  ARG output
+  DO +CABAL --args="build ${target}" --output=$output
+
 PRODUCTION_BUILD_STATIC:
   FUNCTION
   # Generate *.cabal files from package.yaml
-  RUN find . -type f -name package.yaml -exec hpack {} \;
+  DO +GENERATE_CABAL_FILES
   ARG extra_args
   DO +CABAL --args="v2-configure --enable-optimization=2 --enable-static --enable-executable-static ${extra_args}"
-  ARG target="all"
-  DO +CABAL --args="build ${target}" --output="all"
+  ARG target
+  ARG output
+  DO +CABAL --args="build ${target}" --output=$output

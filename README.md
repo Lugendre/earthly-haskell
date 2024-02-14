@@ -1,4 +1,4 @@
-# [WIP] Earthly-Haskell
+# Earthly-Haskell
 
 Earthlyでcabalを使ってHaskellをbuildするScript.
 
@@ -9,7 +9,7 @@ VERSION 0.8
 ARG BASE_TAG="lugendre/earthly-haskell:"
 
 IMPORT github.com/lugendre/earthly-haskell/base/alpine
-IMPORT github.com/lugendre/earthly-haskell/builder
+IMPORT github.com/lugendre/earthly-haskell/haskell
 IMPORT github.com/lugendre/earthly-haskell/installer
 
 build:
@@ -18,18 +18,20 @@ build:
   # Cache the base image.
   SAVE IMAGE --push "${BASE_TAG}alpine3.19.1-ghc9.6.4"
   WORKDIR /production
-  DO v2+INIT
+  DO haskell+INIT
   COPY --keep-ts . .
   # Generate *.cabal files from package.yaml.
-  RUN find . -type f -name package.yaml -exec hpack {} \;
-  DO v2+CABAL --args="update"
-  DO PRODUCTION_BUILD_STATIC --extra-args="--jobs --constraint=\"vector -boundschecks\"" --target="all"
+  DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
+  DO haskell+CABAL --args="update"
+  DO haskell+PRODUCTION_BUILD_STATIC \
+    --target="all" \
+    --output="all" \
+    --extra-args="--jobs --constraint=\"vector -boundschecks\""
   SAVE ARTIFACT output output
 
 docker:
-  FROM alpine:3.19.1
-  COPY +build/output output
-  EXPOSE 9091
+  FROM alipine+alpine:3.19.1
+  COPY +build/output .
   ENTRYPOINT ["./output"]
   SAVE IMAGE --push lugendre/earthly-haskell/examples:haskell
 ```
