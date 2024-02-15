@@ -1,7 +1,7 @@
 VERSION 0.8
 ARG BASE_TAG=lugendre/earthly-haskell-ubuntu:
 
-ubuntu-base-sytem:
+ubuntu-base-system:
   ARG --required UBUNTU_VERSION
   FROM ubuntu:${UBUNTU_VERSION}
   ENV DEBIAN_FRONTEND=noninteractive
@@ -46,12 +46,12 @@ INSTALL_LLVM:
   ENV GHC_LLVM_OPT_PATH="/usr/lib/llvm-${LLVM_VERSION}/bin/opt"
 
 ubuntu20.04:
-  FROM +ubuntu-base-sytem --UBUNTU_VERSION=20.04
+  FROM +ubuntu-base-system --UBUNTU_VERSION=20.04
   ARG TAG=${BASE_TAG}ubuntu20.04
   SAVE IMAGE --push "$TAG"
 
 ubuntu20.04-llvm12:
-  FROM +ubuntu-base-sytem --UBUNTU_VERSION=20.04
+  FROM +ubuntu-base-system --UBUNTU_VERSION=20.04
   ARG TAG=${BASE_TAG}ubuntu2004-llvm12
   DO +INSTALL_LLVM --LLVM_VERSION=12 --LLVM_KEY=6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
   SAVE IMAGE --push "$TAG"

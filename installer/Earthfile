@@ -29,6 +29,7 @@ INSTALL_HPACK:
   FUNCTION
   ARG HPACK_VERSION="0.34.2"
   ARG --required output
+  # TODO: version指定
   RUN cabal update; \
     cabal install hpack --jobs --installdir="${output}" --overwrite-policy=always --install-method=copy;
 
