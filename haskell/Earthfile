@@ -33,7 +33,7 @@ SET_CACHE_MOUNTS_ENV:
   DO +CHECK_INITED
   ARG EARTHLY_TARGET_NAME #https://docs.earthly.dev/docs/earthfile/builtin-args
   ENV EARTHLY_HASKELL_CABAL_DIR_CACHE="type=cache,mode=0777,id=${EARTHLY_CACHE_PREFIX}#cabal-dir,sharing=shared,target=${CABAL_DIR}"
-  ENV EARTHLY_HASKELL_DIST_CACHE="type=cache,mode=0777,id=${EARTHLY_CACHE_PREFIX}#target#${EARTHLY_TARGET_NAME},sharing=locked,target=dist-newstyle"
+  ENV EARTHLY_HASKELL_DIST_CACHE="type=cache,mode=0777,id=${EARTHLY_CACHE_PREFIX}#target#master#${EARTHLY_TARGET_NAME},id=${EARTHLY_CACHE_PREFIX}#target#${EARTHLY_GIT_BRANCH}#${EARTHLY_TARGET_NAME},sharing=locked,target=dist-newstyle"
 
 COPY_OUTPUT:
   FUNCTION
