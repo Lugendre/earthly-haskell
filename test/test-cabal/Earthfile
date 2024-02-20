@@ -63,7 +63,7 @@ test-production:
   COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
   DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO haskell+CABAL --args="update"
-  DO haskell+PRODUCTION_BUILD --output="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
+  DO haskell+PRODUCTION_BUILD --target="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
 
 test-production-build-llvm:
   FROM ubuntu+ubuntu20.04-llvm12
@@ -73,7 +73,7 @@ test-production-build-llvm:
   COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
   DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO haskell+CABAL --args="update"
-  DO haskell+PRODUCTION_BUILD_LLVM --output="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
+  DO haskell+PRODUCTION_BUILD_LLVM --target="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
 
 test-production-build-static:
   FROM alpine+alpine3.19.1
@@ -83,8 +83,8 @@ test-production-build-static:
   COPY --keep-ts . . # COPY cannot understand some globs(e.g. "**").
   DO haskell+FREEZE_WITH_STACKAGE --LTS_VERSION=lts-22.9
   DO haskell+CABAL --args="update"
-  DO haskell+PRODUCTION_BUILD_STATIC --output="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
-  RUN file output/* | grep 'statically linked'
+  DO haskell+PRODUCTION_BUILD_STATIC --target="all" --extra_args="--jobs=4 --constraint=\"vector -boundschecks\""
+  RUN file output/production-static/* | grep 'statically linked'
 
 test-bench:
   FROM alpine+alpine3.19.1

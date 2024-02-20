@@ -19,13 +19,14 @@ CABAL:
   FUNCTION
   DO +CHECK_INITED
   ARG --required args
-  ARG output
+  ARG target
+  ARG output="output"
   DO +SET_CACHE_MOUNTS_ENV
   RUN --mount=$EARTHLY_HASKELL_CABAL_DIR_CACHE --mount=$EARTHLY_HASKELL_DIST_CACHE \
     set -e; \
     eval cabal "${args}";
-  IF [ -n "${output}" ]
-    DO +COPY_OUTPUT --output=$output
+  IF [ -n "${target}" ]
+    DO +COPY_OUTPUT --target=$target --output=$output
   END
 
 SET_CACHE_MOUNTS_ENV:
@@ -37,6 +38,7 @@ SET_CACHE_MOUNTS_ENV:
 
 COPY_OUTPUT:
   FUNCTION
+  ARG --required target
   ARG --required output
   ARG TMP_FOLDER="/tmp/earthly/lib/haskell"
   RUN  if [ ! -n "$EARTHLY_HASKELL_DIST_CACHE" ]; then \
@@ -45,15 +47,15 @@ COPY_OUTPUT:
   fi;
   RUN --mount=$EARTHLY_HASKELL_DIST_CACHE \
       --mount=$EARTHLY_HASKELL_CABAL_DIR_CACHE \
-      if [ -n "$output" ]; then  \
+      if [ -n "$target" ]; then  \
           echo "Copying output files" ;  \
           mkdir -p "${TMP_FOLDER}";  \
-          for file in $(cabal list-bin "${output}"); do \
+          for file in $(cabal list-bin "${target}"); do \
             cp $file $TMP_FOLDER; \
           done; \
       fi;
-  RUN mkdir -p output; \
-      mv "${TMP_FOLDER}"/* output 2>/dev/null || echo "no files found within ./output matching the provided output regexp" ;
+  RUN mkdir -p "${output}"; \
+      mv "${TMP_FOLDER}"/* "${output}" 2>/dev/null || echo "no files found within ./${output} matching the provided output regexp" ;
 
 CHECK_INITED:
   FUNCTION
@@ -81,8 +83,9 @@ BUILD:
   ARG extra_args
   DO +CABAL --args="v2-configure --disable-optimization --enable-tests --enable-benchmarks --ghc-options=\"-Wall -Werror\" ${extra_args}"
   ARG target
-  ARG output
-  DO +CABAL --args="build ${target}" --output=$output
+  ARG bin_target="${target}"
+  ARG output="output/build"
+  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
 
 TEST:
   FUNCTION
@@ -106,8 +109,9 @@ PRODUCTION_BUILD:
   ARG extra_args
   DO +CABAL --args="v2-configure --enable-optimization=2 ${extra_args}"
   ARG target
-  ARG output
-  DO +CABAL --args="build ${target}" --output=$output
+  ARG bin_target="${target}"
+  ARG output="output/production"
+  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
 
 PRODUCTION_BUILD_LLVM:
   FUNCTION
@@ -115,8 +119,9 @@ PRODUCTION_BUILD_LLVM:
   ARG extra_args
   DO +CABAL --args="v2-configure --enable-optimization=2 --ghc-options=\"-fllvm -pgmlo "${GHC_LLVM_OPT_PATH}" -pgmlc "${GHC_LLVM_LLC_PATH}" -optlo-O3 -mavx2\" ${extra_args}"
   ARG target
-  ARG output
-  DO +CABAL --args="build ${target}" --output=$output
+  ARG bin_target="${target}"
+  ARG output="output/production-llvm"
+  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
 
 PRODUCTION_BUILD_STATIC:
   FUNCTION
@@ -125,5 +130,6 @@ PRODUCTION_BUILD_STATIC:
   ARG extra_args
   DO +CABAL --args="v2-configure --enable-optimization=2 --enable-static --enable-executable-static ${extra_args}"
   ARG target
-  ARG output
-  DO +CABAL --args="build ${target}" --output=$output
+  ARG bin_target="${target}"
+  ARG output="output/production-static"
+  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
