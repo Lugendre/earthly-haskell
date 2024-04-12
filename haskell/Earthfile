@@ -90,7 +90,7 @@ BUILD:
   ARG bin_target="${target}"
   ARG output_bin="${target}"
   ARG output="output/build"
-  DO +CABAL --args="build ${target}" --target=$bin_target --output_bin=$bin_output --output=$output
+  DO +CABAL --args="build ${target}" --target=$bin_target --output_bin=$output_bin --output=$output
 
 TEST:
   FUNCTION
