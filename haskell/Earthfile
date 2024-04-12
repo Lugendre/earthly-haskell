@@ -88,8 +88,9 @@ BUILD:
   DO +CABAL --args="v2-configure --disable-optimization --enable-tests --enable-benchmarks --ghc-options=\"-Wall -Werror\" ${extra_args}"
   ARG target
   ARG bin_target="${target}"
+  ARG output_bin="${target}"
   ARG output="output/build"
-  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
+  DO +CABAL --args="build ${target}" --target=$bin_target --output_bin=$bin_output --output=$output
 
 TEST:
   FUNCTION
@@ -114,8 +115,9 @@ PRODUCTION_BUILD:
   DO +CABAL --args="v2-configure --enable-optimization=2 ${extra_args}"
   ARG target
   ARG bin_target="${target}"
+  ARG output_bin="${target}"
   ARG output="output/production"
-  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
+  DO +CABAL --args="build ${target}" --target=$bin_target --output_bin=$output_bin --output=$output
 
 PRODUCTION_BUILD_LLVM:
   FUNCTION
@@ -124,8 +126,9 @@ PRODUCTION_BUILD_LLVM:
   DO +CABAL --args="v2-configure --enable-optimization=2 --ghc-options=\"-fllvm -pgmlo "${GHC_LLVM_OPT_PATH}" -pgmlc "${GHC_LLVM_LLC_PATH}" -optlo-O3 -mavx2\" ${extra_args}"
   ARG target
   ARG bin_target="${target}"
+  ARG output_bin="${target}"
   ARG output="output/production-llvm"
-  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
+  DO +CABAL --args="build ${target}" --target=$bin_target --output_bin=$output_bin --output=$output
 
 PRODUCTION_BUILD_STATIC:
   FUNCTION
@@ -135,5 +138,6 @@ PRODUCTION_BUILD_STATIC:
   DO +CABAL --args="v2-configure --enable-optimization=2 --enable-static --enable-executable-static ${extra_args}"
   ARG target
   ARG bin_target="${target}"
+  ARG output_bin="${target}"
   ARG output="output/production-static"
-  DO +CABAL --args="build ${target}" --target=$bin_target --output=$output
+  DO +CABAL --args="build ${target}" --target=$bin_target --output_bin=$output_bin --output=$output
