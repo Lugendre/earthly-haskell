@@ -20,13 +20,14 @@ CABAL:
   DO +CHECK_INITED
   ARG --required args
   ARG target
+  ARG output_bin=$target
   ARG output="output"
   DO +SET_CACHE_MOUNTS_ENV
   RUN --mount=$EARTHLY_HASKELL_CABAL_DIR_CACHE --mount=$EARTHLY_HASKELL_DIST_CACHE \
     set -e; \
     eval cabal "${args}";
   IF [ -n "${target}" ]
-    DO +COPY_OUTPUT --target=$target --output=$output
+    DO +COPY_OUTPUT --target=$target --output_bin=$output_bin --output=$output
   END
 
 SET_CACHE_MOUNTS_ENV:
@@ -39,6 +40,7 @@ SET_CACHE_MOUNTS_ENV:
 COPY_OUTPUT:
   FUNCTION
   ARG --required target
+  ARG --required output_bin
   ARG --required output
   ARG TMP_FOLDER="/tmp/earthly/lib/haskell"
   RUN  if [ ! -n "$EARTHLY_HASKELL_DIST_CACHE" ]; then \
@@ -50,8 +52,10 @@ COPY_OUTPUT:
       if [ -n "$target" ]; then  \
           echo "Copying output files" ;  \
           mkdir -p "${TMP_FOLDER}";  \
-          for file in $(cabal list-bin "${target}"); do \
-            cp $file $TMP_FOLDER; \
+          for bin_name in $output_bin; do \
+            for file in $(cabal list-bin $bin_name); do \
+              cp $file $TMP_FOLDER; \
+            done; \
           done; \
       fi;
   RUN mkdir -p "${output}"; \
